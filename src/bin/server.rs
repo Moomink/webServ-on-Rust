@@ -1,10 +1,25 @@
 use std::{
+    env,
     io::Write,
     net::{TcpListener, TcpStream},
+    process,
 };
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:8080").unwrap();
+    let mut args: Vec<String> = env::args().collect();
+    if args.len() < 3 {
+        println!("example: ./server ip_address port");
+        process::exit(1);
+    }
+
+    let port = args.remove(2);
+    let ip_address = args.remove(1);
+
+    let bind_ip = ip_address + ":" + &port;
+
+    let listener = TcpListener::bind(&bind_ip).unwrap();
+
+    println!("connected IP:port [{}]", bind_ip);
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
@@ -16,7 +31,21 @@ fn main() {
 }
 
 fn stream_handler(mut stream: TcpStream) {
-    match stream.write("I'm conneced!".as_bytes()) {
+    let response: &str = "
+HTTP/1.0 200 OK
+Content-Type:text/html;charset=utf-8;
+
+<html>
+<head>
+<title>My Server</title>
+</head>
+<body>
+HOGE test
+</body>
+</html>
+";
+
+    match stream.write(response.as_bytes()) {
         Ok(buf_n) => {
             println!("send [{}].", buf_n);
             stream
