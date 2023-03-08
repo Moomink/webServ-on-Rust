@@ -5,6 +5,27 @@ use std::{
     process, str,
 };
 
+use infer;
+
+
+struct HttpRequest {
+    method: Method,
+    version: f32,
+    uri: String,
+    header: Method,
+}
+
+enum Method {
+    GET,
+    HEAD,
+    POST,
+    PUT,
+    DELETE,
+    CONNECT,
+    OPTIONS,
+    TRACE,
+}
+
 fn main() {
     let mut args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -36,14 +57,13 @@ fn stream_handler(mut stream: &TcpStream) {
 
     let mut response: String = String::new();
 
+    stream.read(&mut buffer).unwrap();
+
     let res_header: &str = "
-HTTP/1.1 200 OK
+HTTP/1.0 200 OK
 Content-Type:text/html;charset=utf-8;
 
 ";
-
-    stream.read(&mut buffer).unwrap();
-
     let req: Vec<&str> = str::from_utf8(&buffer).unwrap().split("\r\n").collect();
 
     println!("Request header [{}]", &req[0]);
@@ -57,14 +77,20 @@ Content-Type:text/html;charset=utf-8;
 
     println!("URI: {:?}", uri);
 
+    let ftype = infer::get_from_path(String::from("www/") + uri[0]).expect("file type expected");
+
+    match ftype {
+        ""
+    }
+
     let binding = match fs::read_to_string(String::from("www/") + uri[0]) {
         Ok(data) => data,
         Err(_) => "<html>
 <head>
-<title>My Server</title>
+<title>404 Not Found</title>
 </head>
 <body>
-FRONT test
+No file
 </body>
 </html>
 "
