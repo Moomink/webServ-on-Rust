@@ -7,15 +7,7 @@ use std::{
 
 use infer;
 
-
-struct HttpRequest {
-    method: Method,
-    version: f32,
-    uri: String,
-    header: Method,
-}
-
-enum Method {
+enum RequestMethod {
     GET,
     HEAD,
     POST,
@@ -25,6 +17,30 @@ enum Method {
     OPTIONS,
     TRACE,
 }
+
+trait HttpProtocol{
+    /// Return Self method
+    fn new() -> Self;
+
+    ///Convert from buffer
+    fn from_buffer(buf:&mut [u8]) -> Self;
+
+    ///Convert to str
+    fn to_str()-> str;
+
+
+}
+
+
+struct HttpRequest {
+    method: RequestMethod,
+    version: f32,
+    uri: String,
+    header: RequestMethod,
+}
+
+
+
 
 fn main() {
     let mut args: Vec<String> = env::args().collect();
