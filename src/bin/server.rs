@@ -1,6 +1,7 @@
 use std::{
+    collections::HashMap,
     env, fs,
-    io::{Read, Write},
+    io::{Error, Read, Write},
     net::{TcpListener, TcpStream},
     process, str,
 };
@@ -18,29 +19,38 @@ enum RequestMethod {
     TRACE,
 }
 
-trait HttpProtocol{
-    /// Return Self method
-    fn new() -> Self;
-
-    ///Convert from buffer
-    fn from_buffer(buf:&mut [u8]) -> Self;
-
-    ///Convert to str
-    fn to_str()-> str;
-
-
-}
-
+//TODO HttpResponseクラスも作る
 
 struct HttpRequest {
     method: RequestMethod,
     version: f32,
     uri: String,
-    header: RequestMethod,
+    header: HttpHeader,
 }
 
+struct HttpHeader {
+    hash: HashMap<String, String>,
+}
 
+impl HttpHeader {
+    // create instance
+    fn new() -> HttpHeader {
+        return HttpHeader {
+            hash: HashMap::new(),
+        };
+    }
 
+    fn set(&self, k: String, v: String) {
+        self.hash.insert(k, v);
+    }
+}
+
+impl HttpRequest {
+    fn from_buffer(buf: &[u8]) {
+        let req: &str = str::from_utf8(&buf).unwrap();
+        println!("{}", req);
+    }
+}
 
 fn main() {
     let mut args: Vec<String> = env::args().collect();
@@ -95,10 +105,6 @@ Content-Type:text/html;charset=utf-8;
 
     let ftype = infer::get_from_path(String::from("www/") + uri[0]).expect("file type expected");
 
-    match ftype {
-        ""
-    }
-
     let binding = match fs::read_to_string(String::from("www/") + uri[0]) {
         Ok(data) => data,
         Err(_) => "<html>
@@ -138,5 +144,11 @@ FRONT test
                 .expect("shutdown error");
         }
         Err(e) => println!("couldn't send to client: {e:?}"),
+    }
+}
+
+impl Default for HeaderStruct {
+    fn default() -> Self {
+        Self::new()
     }
 }
