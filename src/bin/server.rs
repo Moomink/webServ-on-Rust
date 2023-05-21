@@ -66,29 +66,8 @@ struct HttpRequest {
     header: HttpHeader,
 }
 
-#[derive(Debug)]
-struct HttpHeader {
-    hash: HashMap<String, String>,
-}
+type HttpHeader = HashMap<String, String>;
 
-impl Default for HttpHeader {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl HttpHeader {
-    // create instance
-    fn new() -> HttpHeader {
-        return HttpHeader {
-            hash: HashMap::new(),
-        };
-    }
-
-    fn set(&mut self, k: &str, v: &str) {
-        self.hash.insert(k.to_string(), v.to_string());
-    }
-}
 impl HttpRequest {
     fn new() -> Self {
         return HttpRequest::default();
@@ -128,7 +107,7 @@ impl HttpRequest {
         for raw_header in req.iter() {
             let parsed_header: Vec<&str> = raw_header.splitn(2, ": ").collect();
             println!("{:?}", parsed_header);
-            headers.set(parsed_header[0], parsed_header[1]);
+            headers.insert(parsed_header[0].to_string(), parsed_header[1].to_string());
         }
 
         let mut request_struct = HttpRequest::new();
