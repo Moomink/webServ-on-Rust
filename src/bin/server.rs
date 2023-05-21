@@ -3,11 +3,13 @@ use std::{
     env, fs,
     io::{Error, Read, Write},
     net::{TcpListener, TcpStream},
-    process, str,
+    process,
+    str::{self, FromStr},
 };
 
 use infer;
 
+#[derive(Debug)]
 enum RequestMethod {
     GET,
     HEAD,
@@ -19,8 +21,44 @@ enum RequestMethod {
     TRACE,
 }
 
-//TODO HttpResponseクラスも作る
+impl RequestMethod {
+    fn from_str(method: &str) -> Result<RequestMethod, &str> {
+        match method {
+            "GET" => Ok(RequestMethod::GET),
+            "HEAD" => Ok(RequestMethod::HEAD),
+            "POST" => Ok(RequestMethod::POST),
+            "PUT" => Ok(RequestMethod::PUT),
+            "DELETE" => Ok(RequestMethod::DELETE),
+            "CONNECT" => Ok(RequestMethod::CONNECT),
+            "OPTIONS" => Ok(RequestMethod::OPTIONS),
+            "TRACE" => Ok(RequestMethod::TRACE),
+            &_ => Err("Selected method is not found in enum."),
+        }
+    }
 
+    fn to_string(&self) -> &str {
+        match self {
+            RequestMethod::GET => "GET",
+            RequestMethod::HEAD => "HEAD",
+            RequestMethod::POST => "POST",
+            RequestMethod::PUT => "PUT",
+            RequestMethod::DELETE => "DELETE",
+            RequestMethod::CONNECT => "CONNECT",
+            RequestMethod::OPTIONS => "OPTIONS",
+            RequestMethod::TRACE => "TRACE",
+            _ => "",
+        }
+    }
+}
+
+impl Default for RequestMethod {
+    fn default() -> Self {
+        RequestMethod::GET
+    }
+}
+
+//TODO HttpResponseクラスも作る
+#[derive(Default, Debug)]
 struct HttpRequest {
     method: RequestMethod,
     version: f32,
@@ -28,8 +66,15 @@ struct HttpRequest {
     header: HttpHeader,
 }
 
+#[derive(Debug)]
 struct HttpHeader {
     hash: HashMap<String, String>,
+}
+
+impl Default for HttpHeader {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl HttpHeader {
@@ -40,22 +85,67 @@ impl HttpHeader {
         };
     }
 
-    fn set(&self, k: String, v: String) {
-        self.hash.insert(k, v);
+    fn set(&mut self, k: &str, v: &str) {
+        self.hash.insert(k.to_string(), v.to_string());
     }
 }
-
 impl HttpRequest {
-    fn from_buffer(buf: &[u8]) {
-        let req: &str = str::from_utf8(&buf).unwrap();
-        println!("{}", req);
+    fn new() -> Self {
+        return HttpRequest::default();
+    }
+
+    fn header(&mut self, header: HttpHeader) {
+        self.header = header;
+    }
+
+    fn uri(&mut self, uri: &str) {
+        self.uri = uri.to_string();
+    }
+
+    fn version(&mut self, version: f32) {
+        self.version = version
+    }
+
+    fn method(&mut self, method: &str) {
+        self.method = RequestMethod::from_str(method).unwrap()
+    }
+
+    fn from_buffer(buf: &[u8]) -> HttpRequest {
+        let mut req: Vec<&str> = str::from_utf8(&buf).unwrap().split("\r\n").collect();
+
+        // 空白の行を削除
+        req.remove(req.len() - 1);
+        req.remove(req.len() - 1);
+
+        let first_line: Vec<&str> = req.swap_remove(0).split(" ").collect();
+
+        //TODO catch error
+        let request_version =
+            f32::from_str(first_line[2].split("/").collect::<Vec<&str>>()[1]).unwrap();
+
+        let mut headers = HttpHeader::new();
+
+        for raw_header in req.iter() {
+            let parsed_header: Vec<&str> = raw_header.splitn(2, ": ").collect();
+            println!("{:?}", parsed_header);
+            headers.set(parsed_header[0], parsed_header[1]);
+        }
+
+        let mut request_struct = HttpRequest::new();
+
+        request_struct.method(first_line[0]);
+        request_struct.uri(first_line[1]);
+        request_struct.version(request_version);
+        request_struct.header(headers);
+
+        return request_struct;
     }
 }
 
 fn main() {
     let mut args: Vec<String> = env::args().collect();
     if args.len() < 3 {
-        println!("example: ./server ip_address port");
+        println!("example: {} <ip_address> <port>", args[0]);
         process::exit(1);
     }
 
@@ -85,6 +175,9 @@ fn stream_handler(mut stream: &TcpStream) {
 
     stream.read(&mut buffer).unwrap();
 
+    let request = HttpRequest::from_buffer(&buffer);
+    println!("{:?}", request);
+
     let res_header: &str = "
 HTTP/1.0 200 OK
 Content-Type:text/html;charset=utf-8;
@@ -103,7 +196,8 @@ Content-Type:text/html;charset=utf-8;
 
     println!("URI: {:?}", uri);
 
-    let ftype = infer::get_from_path(String::from("www/") + uri[0]).expect("file type expected");
+    //TODO ファイルタイプの特定
+    //let ftype = infer::get_from_path(String::from("www/") + uri[0]).expect("file type expected");
 
     let binding = match fs::read_to_string(String::from("www/") + uri[0]) {
         Ok(data) => data,
@@ -144,11 +238,5 @@ FRONT test
                 .expect("shutdown error");
         }
         Err(e) => println!("couldn't send to client: {e:?}"),
-    }
-}
-
-impl Default for HeaderStruct {
-    fn default() -> Self {
-        Self::new()
     }
 }
