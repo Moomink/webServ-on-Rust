@@ -106,7 +106,6 @@ impl HttpRequest {
 
         for raw_header in req.iter() {
             let parsed_header: Vec<&str> = raw_header.splitn(2, ": ").collect();
-            println!("{:?}", parsed_header);
             headers.insert(parsed_header[0].to_string(), parsed_header[1].to_string());
         }
 
@@ -164,16 +163,12 @@ Content-Type:text/html;charset=utf-8;
 ";
     let req: Vec<&str> = str::from_utf8(&buffer).unwrap().split("\r\n").collect();
 
-    println!("Request header [{}]", &req[0]);
-
     // uri split
     let mut uri: Vec<&str> = req[0].split(" ").collect::<Vec<&str>>()[1]
         .split("/")
         .collect();
 
     uri.remove(0);
-
-    println!("URI: {:?}", uri);
 
     //TODO ファイルタイプの特定
     //let ftype = infer::get_from_path(String::from("www/") + uri[0]).expect("file type expected");
@@ -209,7 +204,7 @@ FRONT test
     response.push_str(res_header);
     response.push_str(body);
 
-    println!("Respose data{}", response);
+    println!("Respose data [{}]", response);
     match stream.write(response.as_bytes()) {
         Ok(_) => {
             stream
