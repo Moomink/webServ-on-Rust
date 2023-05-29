@@ -3,6 +3,7 @@ use std::{
     env, fs,
     io::{Error, Read, Write},
     net::{TcpListener, TcpStream},
+    ops::Add,
     process,
     str::{self, FromStr},
 };
@@ -57,7 +58,59 @@ impl Default for RequestMethod {
     }
 }
 
-//TODO HttpResponseクラスも作る
+#[derive(Default, Debug)]
+struct HttpResponse {
+    status_code: i8,
+    version: f32, //TODO 桁数調整
+    reason: String,
+    header: HttpHeader,
+    payload: Vec<u8>,
+}
+
+impl HttpResponse {
+    fn new() -> Self {
+        HttpResponse::default()
+    }
+
+    fn status_code(&mut self, code: i8) {
+        self.status_code = code;
+    }
+
+    fn version(&mut self, version: f32) {
+        self.version = version;
+    }
+
+    fn reason(&mut self, reason: &str) {
+        self.reason = reason.to_string();
+    }
+
+    fn header(&mut self, header: HttpHeader) {
+        self.header = header;
+    }
+
+    fn payload(&mut self, payload: Vec<u8>) {
+        self.payload = payload;
+    }
+
+    fn to_bytes(&mut self) -> Vec<u8> {
+        let mut messages: String = format!(
+            "HTTP/{} {} {}\n",
+            self.version, self.status_code, self.reason
+        );
+        let mut headers: Vec<String> = Vec::new();
+        for (k, v) in self.header.iter() {
+            headers.push(format!("{k}: {v}"));
+        }
+        headers.push("\n".to_string());
+
+        messages.extend(headers);
+
+        let mut bytes = messages.into_bytes();
+        bytes.extend(self.payload.clone());
+        return bytes;
+    }
+}
+
 #[derive(Default, Debug)]
 struct HttpRequest {
     method: RequestMethod,
