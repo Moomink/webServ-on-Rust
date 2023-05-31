@@ -1,9 +1,8 @@
 use std::{
     collections::HashMap,
     env, fs,
-    io::{Error, Read, Write},
+    io::{Read, Write},
     net::{TcpListener, TcpStream},
-    ops::Add,
     process,
     str::{self, FromStr},
 };
@@ -20,6 +19,13 @@ enum RequestMethod {
     CONNECT,
     OPTIONS,
     TRACE,
+}
+
+#[derive(Debug, Clone)]
+enum PayloadType {
+    Text(String),
+    Binary(Vec<u8>),
+    None,
 }
 
 impl RequestMethod {
@@ -47,7 +53,6 @@ impl RequestMethod {
             RequestMethod::CONNECT => "CONNECT",
             RequestMethod::OPTIONS => "OPTIONS",
             RequestMethod::TRACE => "TRACE",
-            _ => "",
         }
     }
 }
@@ -58,21 +63,27 @@ impl Default for RequestMethod {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 struct HttpResponse {
-    status_code: i8,
+    status_code: u16,
     version: f32, //TODO 桁数調整
     reason: String,
     header: HttpHeader,
-    payload: Vec<u8>,
+    payload: PayloadType,
 }
 
 impl HttpResponse {
     fn new() -> Self {
-        HttpResponse::default()
+        Self {
+            status_code: 0,
+            version: 0.0,
+            reason: "".to_string(),
+            header: HttpHeader::default(),
+            payload: PayloadType::None,
+        }
     }
 
-    fn status_code(&mut self, code: i8) {
+    fn status_code(&mut self, code: u16) {
         self.status_code = code;
     }
 
@@ -88,11 +99,12 @@ impl HttpResponse {
         self.header = header;
     }
 
-    fn payload(&mut self, payload: Vec<u8>) {
-        self.payload = payload;
+    fn payload(&mut self, payload: PayloadType) {
+        self.payload = PayloadType::None;
+        self.payload = payload.clone();
     }
 
-    fn to_bytes(&mut self) -> Vec<u8> {
+    fn as_bytes(&mut self) -> Vec<u8> {
         let mut messages: String = format!(
             "HTTP/{} {} {}\n",
             self.version, self.status_code, self.reason
@@ -101,12 +113,18 @@ impl HttpResponse {
         for (k, v) in self.header.iter() {
             headers.push(format!("{k}: {v}"));
         }
-        headers.push("\n".to_string());
+        headers.push("\n\n".to_string());
 
         messages.extend(headers);
 
         let mut bytes = messages.into_bytes();
-        bytes.extend(self.payload.clone());
+
+        match self.payload.clone() {
+            PayloadType::Text(data) => bytes.extend(data.as_bytes()),
+            PayloadType::Binary(data) => bytes.extend(data),
+            PayloadType::None => (),
+        };
+
         return bytes;
     }
 }
@@ -202,63 +220,44 @@ fn main() {
 fn stream_handler(mut stream: &TcpStream) {
     let mut buffer: [u8; 1000] = [0u8; 1000];
 
-    let mut response: String = String::new();
-
     stream.read(&mut buffer).unwrap();
 
     let request = HttpRequest::from_buffer(&buffer);
     println!("{:?}", request);
 
-    let res_header: &str = "
-HTTP/1.0 200 OK
-Content-Type:text/html;charset=utf-8;
+    let mut response = HttpResponse::new();
 
-";
-    let req: Vec<&str> = str::from_utf8(&buffer).unwrap().split("\r\n").collect();
+    response.status_code(200);
+    response.reason("OK");
+    response.version(1.1);
+    let mut response_header: HttpHeader = HttpHeader::new();
 
-    // uri split
-    let mut uri: Vec<&str> = req[0].split(" ").collect::<Vec<&str>>()[1]
-        .split("/")
-        .collect();
+    let file_path = format!("www{}", request.uri);
 
-    uri.remove(0);
+    match fs::read(file_path.clone()) {
+        Ok(data) => {
+            let ftype = infer::get_from_path(file_path)
+                .expect("file read successfully")
+                .expect("file type is known");
+            response_header.insert("Content-Type".to_string(), ftype.mime_type().to_string());
 
-    //TODO ファイルタイプの特定
-    //let ftype = infer::get_from_path(String::from("www/") + uri[0]).expect("file type expected");
-
-    let binding = match fs::read_to_string(String::from("www/") + uri[0]) {
-        Ok(data) => data,
-        Err(_) => "<html>
-<head>
-<title>404 Not Found</title>
-</head>
-<body>
-No file
-</body>
-</html>
-"
-        .to_string(),
-    };
-
-    let body: &str = match uri.is_empty() {
-        true => {
-            "<html>
-<head>
-<title>My Server</title>
-</head>
-<body>
-FRONT test
-</body>
-</html>
-"
+            if ftype.matcher_type() == infer::MatcherType::Text {
+                let string = String::from_utf8(data).expect("Convert Failed.");
+                response.payload(PayloadType::Text(string));
+            } else {
+                response.payload(PayloadType::Binary(data));
+            };
         }
-        false => binding.as_str(),
+        Err(_) => {
+            response.status_code(404);
+            response.reason("File not found.");
+        }
     };
-    response.push_str(res_header);
-    response.push_str(body);
 
-    println!("Respose data [{}]", response);
-    match stream.write(response.as_bytes()) {
+    response.header(response_header);
+
+    println!("Respose data [{:?}]", response);
+    match stream.write(&response.as_bytes()) {
         Ok(_) => {
             stream
                 .shutdown(std::net::Shutdown::Both)
