@@ -1,6 +1,6 @@
 use std::{env, process};
 
-use tcp_web::HttpHandler;
+use tcp_web::http_handler::HttpHandler;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
