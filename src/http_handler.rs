@@ -57,9 +57,18 @@ impl HttpHandler {
 
 pub fn stream_handler(mut stream: &TcpStream) {
     loop {
-        let mut buffer: [u8; 1000] = [0u8; 1000];
+        let mut buffer: Vec<u8> = Vec::new();
+        let mut tmp_buffer: [u8; 1] = [0; 1];
 
-        stream.read(&mut buffer).unwrap();
+        loop {
+            stream.read(&mut tmp_buffer).unwrap();
+            buffer.push(tmp_buffer[0]);
+            if buffer.len() >= 8 {
+                if buffer.ends_with(b"\r\n\r\n") {
+                    break;
+                }
+            }
+        }
 
         let request = HttpRequest::from_buffer(&buffer);
         println!("{:?}", request);
@@ -100,7 +109,7 @@ pub fn stream_handler(mut stream: &TcpStream) {
 
         let header = request.get_header();
         let current_connection = match header.get("Connection") {
-            Some(V) => match (*V).as_str() {
+            Some(v) => match (*v).as_str() {
                 "keep-alive" => "keep-alive",
                 "close" | &_ => "close",
             },
@@ -117,9 +126,13 @@ pub fn stream_handler(mut stream: &TcpStream) {
             Ok(_) => {
                 match current_connection {
                     "keep-alive" => continue,
-                    "None" | &_ => stream
-                        .shutdown(std::net::Shutdown::Both)
-                        .expect("shutdown error"),
+                    "None" | &_ => {
+                        stream
+                            .shutdown(std::net::Shutdown::Both)
+                            .expect("shutdown error");
+                        println!("from {} shutdown success!.", stream.peer_addr().unwrap());
+                        break;
+                    }
                 };
             }
             Err(e) => println!("couldn't send to client: {e:?}"),
