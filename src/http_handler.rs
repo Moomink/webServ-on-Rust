@@ -3,6 +3,7 @@ use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     str::{self},
+    thread,
 };
 
 use crate::{
@@ -19,7 +20,7 @@ pub struct HttpHandler {
 impl HttpHandler {
     pub fn new() -> Self {
         HttpHandler {
-            port: 22,
+            port: 80,
             ip_address: "0.0.0.0".to_string(),
             worker_num: 1,
         }
@@ -47,7 +48,9 @@ impl HttpHandler {
             match stream {
                 Ok(stream) => {
                     println!("from {} receice.", stream.peer_addr().unwrap());
-                    stream_handler(&stream);
+                    let _handle = thread::spawn(move || {
+                        stream_handler(&stream);
+                    });
                 }
                 Err(e) => println!("couldn't get client: {e:?}"),
             }
