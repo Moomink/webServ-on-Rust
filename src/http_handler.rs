@@ -94,6 +94,9 @@ pub fn stream_handler(mut stream: &TcpStream) {
                     .expect("file type is known");
                 response_header.insert("Content-Type".to_string(), ftype.mime_type().to_string());
 
+                let file_size = data.len();
+                response_header.insert("Content-Length".to_string(), file_size.to_string());
+
                 if ftype.matcher_type() == infer::MatcherType::Text {
                     let string = String::from_utf8(data).expect("Convert Failed.");
                     response.payload(PayloadType::Text(string));
