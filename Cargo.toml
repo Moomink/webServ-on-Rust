@@ -15,5 +15,6 @@ path = "./src/bin/server.rs"
 
 
 [dependencies]
-infer = "0.13.0"
+mime = "0.3.17"
+mime_guess = "2.0.4"
 

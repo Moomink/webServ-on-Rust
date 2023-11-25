@@ -6,6 +6,9 @@ use std::{
     thread,
 };
 
+use mime;
+use mime_guess::MimeGuess;
+
 use crate::{
     request::{HttpHeader, HttpRequest, PayloadType},
     response::HttpResponse,
@@ -92,15 +95,17 @@ pub fn stream_handler(mut stream: &TcpStream) {
 
         match fs::read(file_path.clone()) {
             Ok(data) => {
-                let ftype = infer::get_from_path(file_path)
-                    .expect("file read successfully")
-                    .expect("file type is known");
-                response_header.insert("Content-Type".to_string(), ftype.mime_type().to_string());
+                let ftype: MimeGuess = MimeGuess::from_path(file_path.clone());
+
+                response_header.insert(
+                    "Content-Type".to_string(),
+                    ftype.first_or_text_plain().to_string(),
+                );
 
                 let file_size = data.len();
                 response_header.insert("Content-Length".to_string(), file_size.to_string());
-
-                if ftype.matcher_type() == infer::MatcherType::Text {
+                let mut kind = ftype.iter();
+                if kind.any(|mtype| mtype.type_() == mime::TEXT) {
                     let string = String::from_utf8(data).expect("Convert Failed.");
                     response.payload(PayloadType::Text(string));
                 } else {
